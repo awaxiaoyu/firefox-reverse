@@ -39,6 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git -C upstream config apply.ignoreWhitespace change
           UPSTREAM_DIR=upstream PYTHON=python bash firefox-reverse/scripts/apply-patches.sh
           node firefox-reverse/scripts/check-branding-assets.mjs upstream
 

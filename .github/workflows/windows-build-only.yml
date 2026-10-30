@@ -1,0 +1,64 @@
+name: Windows Build Only
+
+on:
+  push:
+    branches:
+      - windows-build-only-20261030
+
+permissions:
+  contents: read
+
+env:
+  FIREFOX_REV: cebc55aab4d2661d1f6c2d1526362947ec4016c1
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Firefox-Reverse
+        uses: actions/checkout@v4
+        with:
+          path: firefox-reverse
+
+      - name: Checkout pinned Firefox source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/mozilla-firefox/firefox.git
+          git -C upstream fetch --depth 1 origin "$FIREFOX_REV"
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = "$FIREFOX_REV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Apply Firefox-Reverse patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          UPSTREAM_DIR=upstream PYTHON=python bash firefox-reverse/scripts/apply-patches.sh
+          node firefox-reverse/scripts/check-branding-assets.mjs upstream
+
+      - name: Bootstrap, build, package, and verify
+        shell: bash
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          ./mach --no-interactive bootstrap --application-choice browser
+          ./mach configure --with-branding=browser/branding/unofficial
+          objdir=$(./mach environment --format json | python -c 'import json,sys; print(json.load(sys.stdin)["topobjdir"])')
+          python "$GITHUB_WORKSPACE/firefox-reverse/scripts/verify-branding.py" --objdir "$objdir"
+          ./mach build
+          ./mach package
+          python "$GITHUB_WORKSPACE/firefox-reverse/scripts/verify-branding.py" --package "$objdir/dist/firefox"
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-reverse-windows-x86_64
+          path: upstream/obj-*/dist/install/**/firefox-*.zip
+          if-no-files-found: error
+          retention-days: 14

@@ -35,6 +35,16 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install MozillaBuild
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'MozillaBuildSetup-4.2.1.exe'
+          Invoke-WebRequest -Uri 'https://archive.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-4.2.1.exe' -OutFile $installer
+          $process = Start-Process -FilePath $installer -ArgumentList @('/S', '/D=C:\mozilla-build') -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "MozillaBuild installer exited with code $($process.ExitCode)" }
+          if (-not (Test-Path 'C:\mozilla-build\msys2')) { throw 'MozillaBuild installation was not found at C:\mozilla-build' }
+
       - name: Apply Firefox-Reverse patches
         shell: bash
         run: |

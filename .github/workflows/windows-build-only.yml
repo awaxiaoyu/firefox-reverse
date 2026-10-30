@@ -53,9 +53,13 @@ jobs:
           UPSTREAM_DIR=upstream PYTHON=python bash firefox-reverse/scripts/apply-patches.sh
           node firefox-reverse/scripts/check-branding-assets.mjs upstream
 
+      - name: Move Firefox source to a short path
+        shell: pwsh
+        run: Move-Item -LiteralPath upstream -Destination D:\f
+
       - name: Bootstrap, build, package, and verify
         shell: bash
-        working-directory: upstream
+        working-directory: D:\f
         run: |
           set -euo pipefail
           ./mach --no-interactive bootstrap --application-choice browser

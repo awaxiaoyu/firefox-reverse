@@ -34,6 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "${{ matrix.target }}" == windows ]]; then git config --global core.longpaths true; fi
           git init upstream
           git -C upstream remote add origin https://github.com/mozilla-firefox/firefox.git
           git -C upstream fetch --depth 1 origin "$FIREFOX_REV"

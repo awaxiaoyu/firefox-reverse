@@ -29,8 +29,6 @@ jobs:
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: firefox-reverse
 
       - name: Checkout pinned Firefox source
         shell: bash
@@ -61,8 +59,8 @@ jobs:
           set -euo pipefail
           if [[ "${{ matrix.target }}" == windows ]]; then git -C upstream config apply.ignoreWhitespace change; fi
           if [[ "${{ matrix.target }}" == windows ]]; then export PATH="/c/mozilla-build/msys2/usr/bin:$PATH"; fi
-          UPSTREAM_DIR="$GITHUB_WORKSPACE/upstream" PYTHON=python bash "$GITHUB_WORKSPACE/firefox-reverse/scripts/apply-patches.sh"
-          node "$GITHUB_WORKSPACE/firefox-reverse/scripts/check-branding-assets.mjs" "$GITHUB_WORKSPACE/upstream"
+          UPSTREAM_DIR="$GITHUB_WORKSPACE/upstream" PYTHON=python bash "$GITHUB_WORKSPACE/scripts/apply-patches.sh"
+          node "$GITHUB_WORKSPACE/scripts/check-branding-assets.mjs" "$GITHUB_WORKSPACE/upstream"
 
       - name: Move Windows source to a short path
         if: matrix.target == 'windows'

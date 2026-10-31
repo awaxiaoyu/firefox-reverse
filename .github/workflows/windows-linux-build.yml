@@ -53,6 +53,16 @@ jobs:
           $p = Start-Process -FilePath $installer -ArgumentList @('/S', '/D=C:\mozilla-build') -Wait -PassThru
           if ($p.ExitCode -ne 0 -or -not (Test-Path 'C:\mozilla-build\msys2')) { throw 'MozillaBuild installation failed' }
 
+      - name: Install rsync on Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install rsync -y --no-progress
+          $rsync = Get-ChildItem -Path 'C:\Program Files','C:\ProgramData\chocolatey\lib' -Filter rsync.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $rsync) { throw 'rsync.exe was not found after installation' }
+          $rsync.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Apply Firefox-Reverse patches
         shell: bash
         run: |

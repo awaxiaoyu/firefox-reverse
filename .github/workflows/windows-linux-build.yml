@@ -61,8 +61,8 @@ jobs:
           set -euo pipefail
           if [[ "${{ matrix.target }}" == windows ]]; then git -C upstream config apply.ignoreWhitespace change; fi
           if [[ "${{ matrix.target }}" == windows ]]; then export PATH="/c/mozilla-build/msys2/usr/bin:$PATH"; fi
-          UPSTREAM_DIR=upstream PYTHON=python bash firefox-reverse/scripts/apply-patches.sh
-          node firefox-reverse/scripts/check-branding-assets.mjs upstream
+          UPSTREAM_DIR="$GITHUB_WORKSPACE/upstream" PYTHON=python bash "$GITHUB_WORKSPACE/firefox-reverse/scripts/apply-patches.sh"
+          node "$GITHUB_WORKSPACE/firefox-reverse/scripts/check-branding-assets.mjs" "$GITHUB_WORKSPACE/upstream"
 
       - name: Move Windows source to a short path
         if: matrix.target == 'windows'

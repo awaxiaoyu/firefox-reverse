@@ -1,0 +1,97 @@
+name: Build Windows and Linux packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: Build both Windows and Linux packages
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  FIREFOX_REV: cebc55aab4d2661d1f6c2d1526362947ec4016c1
+
+jobs:
+  build:
+    if: ${{ inputs.build_all }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: firefox-reverse
+
+      - name: Checkout pinned Firefox source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/mozilla-firefox/firefox.git
+          git -C upstream fetch --depth 1 origin "$FIREFOX_REV"
+          git -C upstream checkout --detach FETCH_HEAD
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install MozillaBuild
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'MozillaBuildSetup-4.2.1.exe'
+          Invoke-WebRequest -Uri 'https://archive.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-4.2.1.exe' -OutFile $installer
+          $p = Start-Process -FilePath $installer -ArgumentList @('/S', '/D=C:\mozilla-build') -Wait -PassThru
+          if ($p.ExitCode -ne 0 -or -not (Test-Path 'C:\mozilla-build\msys2')) { throw 'MozillaBuild installation failed' }
+
+      - name: Apply Firefox-Reverse patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.target }}" == windows ]]; then git -C upstream config apply.ignoreWhitespace change; fi
+          UPSTREAM_DIR=upstream PYTHON=python bash firefox-reverse/scripts/apply-patches.sh
+          node firefox-reverse/scripts/check-branding-assets.mjs upstream
+
+      - name: Move Windows source to a short path
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: Move-Item -LiteralPath upstream -Destination D:\f
+
+      - name: Bootstrap, build, and package
+        shell: bash
+        working-directory: ${{ matrix.target == 'windows' && 'D:\f' || 'upstream' }}
+        run: |
+          set -euo pipefail
+          ./mach --no-interactive bootstrap --application-choice browser
+          ./mach configure --with-branding=browser/branding/unofficial
+          ./mach build
+          ./mach package
+
+      - name: Upload Windows package
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-reverse-windows-x86_64
+          path: D:/f/obj-*/dist/install/**/firefox-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Linux package
+        if: matrix.target == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-reverse-linux-x86_64
+          path: upstream/obj-*/dist/firefox-*.tar.*
+          if-no-files-found: error
+          retention-days: 14

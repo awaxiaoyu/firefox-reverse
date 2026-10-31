@@ -46,9 +46,25 @@ if [[ -d "$REPO_ROOT/additions" ]]; then
   if [[ -n "$(find "$REPO_ROOT/additions" -mindepth 1 -not -name 'README.md' -print -quit 2>/dev/null)" ]]; then
     echo "[apply-patches] copying additions/ to $UPSTREAM_DIR"
     # 排除 agent-sidebar 的前端开发文件（Firefox 构建只需 bundle/html/css + .sys.mjs）
-    rsync -a --exclude README.md --exclude node_modules --exclude dev \
-      --exclude '*.jsx' --exclude 'package*.json' --exclude .gitignore \
-      "$REPO_ROOT/additions/" "$UPSTREAM_DIR/"
+    if [[ -n "${MSYSTEM:-}" ]]; then
+      python - "$REPO_ROOT/additions" "$UPSTREAM_DIR" <<'PY'
+import os, shutil, sys
+src, dst = sys.argv[1:]
+for root, dirs, files in os.walk(src):
+    dirs[:] = [d for d in dirs if d not in {"node_modules", "dev"}]
+    rel = os.path.relpath(root, src)
+    target = dst if rel == "." else os.path.join(dst, rel)
+    os.makedirs(target, exist_ok=True)
+    for name in files:
+        if name == "README.md" or name == ".gitignore" or name.endswith(".jsx") or name.startswith("package"):
+            continue
+        shutil.copy2(os.path.join(root, name), os.path.join(target, name))
+PY
+    else
+      rsync -a --exclude README.md --exclude node_modules --exclude dev \
+        --exclude '*.jsx' --exclude 'package*.json' --exclude .gitignore \
+        "$REPO_ROOT/additions/" "$UPSTREAM_DIR/"
+    fi
   fi
 fi
 
